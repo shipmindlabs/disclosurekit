@@ -86,7 +86,7 @@ test("a system can carry several obligations at once", () => {
     deepfake: true,
   });
   assert.deepEqual(ids(result.applies).sort(), ["art50-1", "art50-2", "art50-4-deepfake"]);
-  assert.deepEqual(measures(result).sort(), [
+  assert.deepEqual([...measures(result)].sort(), [
     "disclose-artificial-content",
     "inform-before-interaction",
     "mark-machine-readable",
