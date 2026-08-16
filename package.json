@@ -1,0 +1,31 @@
+{
+  "name": "disclosurekit",
+  "version": "0.0.0",
+  "description": "EU AI Act Article 50 transparency obligations as code: what applies, what to say, what is still uncovered, and a record that it happened.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "demo": "node example/demo.ts"
+  },
+  "keywords": [
+    "eu-ai-act",
+    "article-50",
+    "transparency",
+    "disclosure",
+    "compliance",
+    "ai"
+  ]
+}

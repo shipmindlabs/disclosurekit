@@ -1,0 +1,6 @@
+# Secrets never live in the tree.
+.env
+.env.*
+
+node_modules/
+dist/
