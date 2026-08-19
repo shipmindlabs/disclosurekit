@@ -3,6 +3,19 @@
   "version": "0.0.0",
   "description": "EU AI Act Article 50 transparency obligations as code: what applies, what to say, what is still uncovered, and a record that it happened.",
   "license": "MIT",
+  "author": {
+    "name": "Shipmind Labs",
+    "email": "hello@shipmindlabs.com",
+    "url": "https://shipmindlabs.com"
+  },
+  "homepage": "https://github.com/shipmindlabs/disclosurekit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shipmindlabs/disclosurekit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shipmindlabs/disclosurekit/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=22.18"

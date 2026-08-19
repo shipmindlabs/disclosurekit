@@ -147,3 +147,5 @@ npm run typecheck   # needs: npm i -D typescript
 ## License
 
 MIT
+
+Maintained by [Shipmind Labs](https://shipmindlabs.com).
