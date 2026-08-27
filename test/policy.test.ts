@@ -75,6 +75,7 @@ test("a system that triggers nothing produces no obligations and no noise", () =
   const result = assess({ role: "both" });
   assert.deepEqual(ids(result.applies), []);
   assert.deepEqual(ids(result.excluded), []);
+  assert.deepEqual(ids(result.needsReview), []);
   assert.deepEqual(measures(result), []);
 });
 
@@ -91,4 +92,78 @@ test("a system can carry several obligations at once", () => {
     "inform-before-interaction",
     "mark-machine-readable",
   ]);
+});
+
+test("an unanswered trigger is a question, not a no", () => {
+  const result = assess({ role: "provider", interactsWithPeople: "unknown" });
+  assert.deepEqual(ids(result.applies), []);
+  assert.deepEqual(ids(result.excluded), []);
+  assert.deepEqual(ids(result.needsReview), ["art50-1"]);
+  assert.match(result.needsReview[0].question, /interacts directly with natural persons/);
+});
+
+test("an omitted field is a no and raises nothing to review", () => {
+  const result = assess({ role: "both", interactsWithPeople: false });
+  assert.deepEqual(ids(result.applies), []);
+  assert.deepEqual(ids(result.needsReview), []);
+});
+
+test("a question about someone else's duty is not yours to answer either", () => {
+  const result = assess({ role: "deployer", interactsWithPeople: "unknown" });
+  assert.deepEqual(ids(result.applies), []);
+  assert.deepEqual(ids(result.excluded), []);
+  assert.deepEqual(ids(result.needsReview), []);
+});
+
+test("an unanswered exemption suspends the duty instead of granting or denying it", () => {
+  const result = assess({
+    role: "provider",
+    generatesSyntheticContent: true,
+    assistiveEditingOnly: "unknown",
+  });
+  assert.deepEqual(ids(result.applies), []);
+  assert.deepEqual(ids(result.excluded), []);
+  assert.deepEqual(ids(result.needsReview), ["art50-2"]);
+  assert.match(result.needsReview[0].question, /assistive standard editing/);
+});
+
+test("one yes settles a trigger its other half left open", () => {
+  const settled = assess({
+    role: "deployer",
+    emotionRecognition: true,
+    biometricCategorisation: "unknown",
+  });
+  assert.deepEqual(ids(settled.applies), ["art50-3"]);
+  assert.deepEqual(ids(settled.needsReview), []);
+
+  const open = assess({
+    role: "deployer",
+    emotionRecognition: false,
+    biometricCategorisation: "unknown",
+  });
+  assert.deepEqual(ids(open.applies), []);
+  assert.deepEqual(ids(open.needsReview), ["art50-3"]);
+});
+
+// The duty to disclose a deep fake never depends on the answer, so an
+// unanswered artistic claim leaves only the manner open.
+test("an unanswered artistic claim keeps the deepfake duty and asks about the manner", () => {
+  const result = assess({ role: "deployer", deepfake: true, artisticOrSatirical: "unknown" });
+  assert.deepEqual(ids(result.applies), ["art50-4-deepfake"]);
+  assert.equal(result.applies[0].note, undefined);
+  assert.deepEqual(ids(result.needsReview), ["art50-4-deepfake"]);
+  assert.match(result.needsReview[0].question, /manner of disclosure but not the duty/);
+});
+
+test("an unanswered law-enforcement claim reaches every obligation it could exempt", () => {
+  const result = assess({
+    role: "both",
+    interactsWithPeople: true,
+    generatesSyntheticContent: true,
+    emotionRecognition: true,
+    lawEnforcementAuthorised: "unknown",
+  });
+  assert.deepEqual(ids(result.applies), []);
+  assert.deepEqual(ids(result.excluded), []);
+  assert.deepEqual(ids(result.needsReview).sort(), ["art50-1", "art50-2", "art50-3"]);
 });
