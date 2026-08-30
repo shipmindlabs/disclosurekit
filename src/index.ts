@@ -1,9 +1,10 @@
 /**
  * disclosurekit — the transparency obligations of Article 50 of the EU AI Act,
- * as code you can run: what applies, what to say, what was not covered, and a
- * record that it happened.
+ * as code you can run: what applies, what a notice must contain and where it
+ * goes, what was not covered, and a record that it happened.
  *
- * It does not mark content and it is not legal advice. See README.md.
+ * It does not write your disclosure, it does not mark content, and it is not
+ * legal advice. See README.md.
  */
 
 export {
@@ -21,9 +22,16 @@ export {
 
 export {
   disclose,
+  requirements,
   DISCLOSURE_HEADER,
+  ELEMENTS,
+  IncompleteDisclosure,
   type Disclosure,
-  type DisclosureOptions,
+  type Element,
+  type ElementId,
+  type Notice,
+  type Placement,
+  type Requirement,
 } from "./disclosure.ts";
 
 export {

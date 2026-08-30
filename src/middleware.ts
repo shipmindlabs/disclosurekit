@@ -6,13 +6,13 @@
  * fetch-style server — without this package knowing about any of them.
  */
 
-import { disclose, DISCLOSURE_HEADER, type Disclosure, type DisclosureOptions } from "./disclosure.ts";
+import { disclose, DISCLOSURE_HEADER, type Disclosure, type Notice } from "./disclosure.ts";
 import type { EvidenceLog } from "./log.ts";
 import type { SystemProfile } from "./policy.ts";
 
 export type Handler = (request: Request) => Response | Promise<Response>;
 
-export type MiddlewareOptions = DisclosureOptions & {
+export type MiddlewareOptions = Notice & {
   /** Records every disclosure served, for the day someone asks. */
   readonly log?: EvidenceLog;
   /**
@@ -25,6 +25,10 @@ export type MiddlewareOptions = DisclosureOptions & {
 
 /**
  * Wrap a handler so its responses carry the disclosure.
+ *
+ * The notice is built once, when the handler is wrapped, so wording that is
+ * missing an element fails where a service starts up rather than in front of a
+ * user mid-request.
  *
  * The header goes on every response; the body is touched only when
  * `injectJsonKey` says so. Nothing here marks content — see `Marker` — so a
@@ -41,6 +45,7 @@ export function withDisclosure(
     obligations: disclosure.obligations,
     unmetByStatement: disclosure.unmetByStatement,
     notes: disclosure.notes,
+    locale: disclosure.locale,
   });
 
   return async (request: Request): Promise<Response> => {
@@ -73,8 +78,8 @@ export function withDisclosure(
 }
 
 /** The disclosure a wrapped handler will serve, for tests and for rendering it in a UI. */
-export function disclosureFor(profile: SystemProfile, options: DisclosureOptions = {}): Disclosure {
-  return disclose(profile, options);
+export function disclosureFor(profile: SystemProfile, notice: Notice = {}): Disclosure {
+  return disclose(profile, notice);
 }
 
 export { DISCLOSURE_HEADER };
