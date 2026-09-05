@@ -10,6 +10,15 @@
  * to `needsReview` rather than being resolved by guesswork.
  */
 
+/**
+ * The version of the rules encoded in this file. It is stamped on every
+ * evidence record, because a decision only means something next to the rules
+ * that produced it: a record read in two years has to say which reading of the
+ * article it was made under. Bump it whenever a trigger, an exemption or an
+ * obligation's wording changes here.
+ */
+export const RULES_VERSION = "eu-ai-act-article-50@1";
+
 /** Who carries an obligation. The article splits them deliberately. */
 export type Bearer = "provider" | "deployer";
 
@@ -283,4 +292,40 @@ export function assess(profile: SystemProfile): Assessment {
 /** The measures a profile has to implement, deduplicated. */
 export function measures(assessment: Assessment): readonly Measure[] {
   return [...new Set(assessment.applies.map((a) => a.obligation.measure))];
+}
+
+/** What was stated about one question, including the fact that nothing was. */
+export type StatedInput = Answer | "not stated";
+
+const QUESTIONS = [
+  "interactsWithPeople",
+  "generatesSyntheticContent",
+  "deepfake",
+  "emotionRecognition",
+  "biometricCategorisation",
+  "obviousFromContext",
+  "assistiveEditingOnly",
+  "artisticOrSatirical",
+  "publicInterestText",
+  "humanEditorialReview",
+  "lawEnforcementAuthorised",
+] as const satisfies readonly (keyof SystemProfile)[];
+
+/**
+ * The profile as a record keeps it: every question this file can ask, with the
+ * answer that was given.
+ *
+ * An omitted field decides the assessment the same way a `false` does, but the
+ * two are not the same claim, and a reader of the record months from now should
+ * not have to know the defaulting rule to tell them apart. So an unanswered
+ * question is written down as "not stated" rather than as a no nobody made.
+ */
+export function inputsOf(
+  profile: SystemProfile,
+): Readonly<Record<string, StatedInput | SystemProfile["role"]>> {
+  const stated: Record<string, StatedInput | SystemProfile["role"]> = { role: profile.role };
+  for (const question of QUESTIONS) {
+    stated[question] = profile[question] ?? "not stated";
+  }
+  return stated;
 }

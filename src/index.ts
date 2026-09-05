@@ -9,14 +9,19 @@
 
 export {
   assess,
+  inputsOf,
   measures,
   OBLIGATIONS,
+  RULES_VERSION,
+  type Answer,
   type Applied,
   type Assessment,
   type Bearer,
   type Exclusion,
   type Measure,
   type Obligation,
+  type Review,
+  type StatedInput,
   type SystemProfile,
 } from "./policy.ts";
 
@@ -42,8 +47,11 @@ export {
 } from "./marker.ts";
 
 export {
+  recordDecision,
   EvidenceLog,
+  EVIDENCE_FORMAT,
   GENESIS,
+  HASH_ALGORITHM,
   type Entry,
   type EventKind,
   type VerifyResult,

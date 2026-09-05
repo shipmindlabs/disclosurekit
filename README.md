@@ -147,8 +147,25 @@ of Regulation (EU) 2024/1689 governs.
 ## The evidence log
 
 Meeting an obligation and being able to show you met it are different problems,
-and the second arrives with a letter months later. Entries are chained by hash,
-so a removed or edited entry is detectable and the check names which one:
+and the second arrives with a letter months later. Every decision is recorded
+with the inputs as they were stated, the version of the rules that read them,
+the wording that was shown, and the time:
+
+```ts
+log.entries[0].detail.inputs;
+// { role: "provider", interactsWithPeople: true, deepfake: "not stated", … }
+log.entries[0].rules;
+// "eu-ai-act-article-50@1"
+```
+
+A question nobody answered is written down as `"not stated"`, not as a no. It
+decides the assessment the same way a `false` does, but it is not the same
+claim, and the record should not make one on your behalf. Exemptions keep the
+reason, adapted duties keep their note, and unanswered questions keep their
+wording, so the file argues its own case without this code.
+
+Entries are chained by hash, so a removed or edited entry is detectable and the
+check names which one:
 
 ```ts
 log.verify();
@@ -157,6 +174,38 @@ log.verify();
 
 This does not stop anyone from editing the file — no library can — it makes the
 edit show.
+
+### Reading it without this package
+
+`toJSONL()` writes one record per line, keys sorted and no whitespace: the same
+bytes that were hashed. Each line carries its own format, hash algorithm,
+timestamp and rule version, so a line taken out of the file still explains what
+it is.
+
+```ts
+await writeFile("evidence.jsonl", log.toJSONL());
+```
+
+Verifying takes no dependency on this library, in anything that has JSON and
+SHA-256. Drop the `hash` field, serialise the rest with sorted keys and no
+whitespace, digest, compare:
+
+```python
+import hashlib, json
+
+previous = "0" * 64
+for line in open("evidence.jsonl", encoding="utf-8"):
+    record = json.loads(line)
+    body = {k: v for k, v in record.items() if k != "hash"}
+    # ensure_ascii=False: the file holds UTF-8, not \u escapes
+    canonical = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    assert hashlib.sha256(canonical.encode("utf-8")).hexdigest() == record["hash"]
+    assert record["previousHash"] == previous
+    previous = record["hash"]
+```
+
+A record outlives the code that wrote it, which is why it is a line of JSON and
+not an object graph only this package can open.
 
 ## Install
 
@@ -176,7 +225,7 @@ are honest gaps rather than oversights.
 |---|---|
 | Covered | Article 50(1)–(5): interaction, synthetic content, emotion recognition and biometric categorisation, deep fakes, public-interest text |
 | Disclosure | required elements, placement rules, your wording, `AI-Disclosure` header, optional JSON key |
-| Evidence | hash-chained append-only log, JSON round trip |
+| Evidence | hash-chained append-only log, inputs and rule version on every record, JSONL export verifiable with SHA-256 alone |
 | Not yet | ready-made UI components, marker adapters for C2PA, transform-survival checks, other articles of the Act |
 
 The `AI-Disclosure` header is this package's own convention. No standard header

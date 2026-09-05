@@ -7,13 +7,16 @@
  */
 
 import { disclose, DISCLOSURE_HEADER, type Disclosure, type Notice } from "./disclosure.ts";
-import type { EvidenceLog } from "./log.ts";
+import { recordDecision, type EvidenceLog } from "./log.ts";
 import type { SystemProfile } from "./policy.ts";
 
 export type Handler = (request: Request) => Response | Promise<Response>;
 
 export type MiddlewareOptions = Notice & {
-  /** Records every disclosure served, for the day someone asks. */
+  /**
+   * Records the decision — the inputs as stated, the rules that read them, the
+   * wording — and then every disclosure served, for the day someone asks.
+   */
   readonly log?: EvidenceLog;
   /**
    * Adds the statement to JSON responses under this key. Off by default: a
@@ -28,7 +31,8 @@ export type MiddlewareOptions = Notice & {
  *
  * The notice is built once, when the handler is wrapped, so wording that is
  * missing an element fails where a service starts up rather than in front of a
- * user mid-request.
+ * user mid-request. The decision is recorded at that same moment, before a
+ * single request has been served.
  *
  * The header goes on every response; the body is touched only when
  * `injectJsonKey` says so. Nothing here marks content — see `Marker` — so a
@@ -41,12 +45,7 @@ export function withDisclosure(
   options: MiddlewareOptions = {},
 ): Handler {
   const disclosure = disclose(profile, options);
-  options.log?.append("assessment", {
-    obligations: disclosure.obligations,
-    unmetByStatement: disclosure.unmetByStatement,
-    notes: disclosure.notes,
-    locale: disclosure.locale,
-  });
+  if (options.log) recordDecision(options.log, profile, disclosure);
 
   return async (request: Request): Promise<Response> => {
     const response = await handler(request);
@@ -64,9 +63,14 @@ export function withDisclosure(
       headers.delete("content-length");
     }
 
+    // What was shown, where and in which words: kept whole, so that one line
+    // answers the question without the line that came before it.
     options.log?.append("disclosure-shown", {
       path: new URL(request.url).pathname,
+      method: request.method,
       obligations: disclosure.obligations,
+      statement: disclosure.statement,
+      locale: disclosure.locale,
     });
 
     return new Response(body, {
