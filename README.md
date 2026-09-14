@@ -12,6 +12,44 @@ This package works out which rules apply, tells you what a notice must contain
 and where it has to appear, and keeps the record. It does **not** write the
 notice, it does **not** mark content, and it is **not** legal advice.
 
+## What it decides
+
+Five duties, one table. Everything `assess()` returns comes from these rows.
+
+| Article | Who owes it | It bites when | What has to happen | What can excuse it |
+|---|---|---|---|---|
+| 50(1) | provider | the system interacts directly with people | tell them they are dealing with an AI, at the latest at the first interaction | the AI is obvious to a reasonably well-informed, observant person; authorised law enforcement |
+| 50(2) | provider | the system generates or manipulates synthetic audio, image, video or text | embed a machine-readable mark in the content, detectable as artificially generated | assistive standard editing that does not substantially alter the input; authorised law enforcement |
+| 50(3) | deployer | people are exposed to emotion recognition or biometric categorisation | tell them it is operating, at the latest at the first exposure | authorised law enforcement |
+| 50(4) | deployer | the content is a deep fake of real people, places or events | disclose that it was artificially generated or manipulated | nothing removes it; an artistic, creative or satirical work changes the manner, not the duty |
+| 50(4) | deployer | AI-generated text is published to inform the public on matters of public interest | disclose that the text was artificially generated | a natural or legal person holds editorial responsibility and reviewed the text |
+
+Three readings of that table are easy to get wrong, so the code takes a position
+on each:
+
+- **A duty addressed to a role you did not claim is not your exemption.** A
+  deployer of someone else's chatbot does not carry 50(1) and is not excused
+  from it either; the obligation appears in neither list, because it belongs to
+  the provider.
+- **An artistic deep fake is still disclosed.** Filing it as an exemption would
+  be this package's most damaging possible mistake. It comes back as an applied
+  duty with a note about the manner.
+- **A question nobody answered is not a no.** An input given as `"unknown"`
+  sends the obligation to `needsReview`, where nothing is safe to ship; an input
+  left out entirely decides the same way a `false` does but is written into the
+  record as `"not stated"`, because the two are not the same claim.
+
+The article has applied since **2 August 2026**. This package does not reason
+about dates: it reads the system as you describe it today and assumes the
+article is in force. A decision taken under an older reading of the rules is
+recorded as what it was, by stamping the log with the version that was current
+then — `new EvidenceLog({ rules: "eu-ai-act-article-50@0" })`.
+
+> **This is not legal advice.** It is a map of the structure of one article,
+> written by engineers. It does not know your system, your national implementing
+> measures or your case. The text of Regulation (EU) 2024/1689 governs, and
+> where the answer matters, a lawyer does.
+
 ## What a run looks like
 
 ```console
@@ -141,8 +179,8 @@ lean on.** Article 50 splits duties between provider and deployer; obligations
 addressed to a role you did not claim appear in neither list, because they are
 not your exemptions.
 
-**It is not legal advice.** This is a map of the article's structure. The text
-of Regulation (EU) 2024/1689 governs.
+**It is not legal advice.** As said above the table: the map is not the
+territory, and the text of Regulation (EU) 2024/1689 governs.
 
 ## The evidence log
 
