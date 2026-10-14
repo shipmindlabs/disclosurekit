@@ -31,6 +31,7 @@ export {
   DISCLOSURE_HEADER,
   ELEMENTS,
   IncompleteDisclosure,
+  UnresolvedQuestions,
   type Disclosure,
   type Element,
   type ElementId,

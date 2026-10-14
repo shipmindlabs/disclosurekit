@@ -10,7 +10,14 @@
  * in with a default nobody chose.
  */
 
-import { assess, measures, type Assessment, type Measure, type SystemProfile } from "./policy.ts";
+import {
+  assess,
+  measures,
+  type Assessment,
+  type Measure,
+  type Review,
+  type SystemProfile,
+} from "./policy.ts";
 
 /**
  * The header this library sets. There is no standard header for this — the
@@ -140,6 +147,27 @@ export class IncompleteDisclosure extends Error {
 }
 
 /**
+ * Raised instead of serving a system whose assessment still has open questions.
+ *
+ * An obligation in `needsReview` is one the inputs could not settle, so there is
+ * no honest notice to build: a profile that might owe Article 50(1) and might
+ * not would otherwise go out with no header at all, which looks exactly like a
+ * system that owes nothing.
+ */
+export class UnresolvedQuestions extends Error {
+  readonly questions: readonly Review[] = [];
+
+  constructor(questions: readonly Review[]) {
+    super(
+      "the assessment leaves a question unanswered, and nothing here is safe to ship: " +
+        questions.map((review) => `${review.obligation.article}: ${review.question}`).join("; "),
+    );
+    this.name = "UnresolvedQuestions";
+    this.questions = questions;
+  }
+}
+
+/**
  * What a profile has to disclose, and where. This is the part of the notice the
  * package can supply: the elements, the deadline, the placement. The sentences
  * that carry them are the caller's.
@@ -166,10 +194,14 @@ function requirementsOf(assessment: Assessment): readonly Requirement[] {
 /**
  * Build the disclosure for a profile from the caller's wording.
  *
- * Throws `IncompleteDisclosure` when an element the profile requires has no
- * text. What cannot be checked here is whether a sentence says what it must in
- * the language it was written in; a person still has to read it. The check is
- * that nothing was left blank, which is the failure a library can catch.
+ * Throws `UnresolvedQuestions` when the assessment could not settle an
+ * obligation, and `IncompleteDisclosure` when an element the profile requires
+ * has no text. The order matters: an unanswered question is checked first,
+ * because until it is answered nobody knows which elements the notice owes.
+ *
+ * What cannot be checked here is whether a sentence says what it must in the
+ * language it was written in; a person still has to read it. The check is that
+ * nothing was left blank, which is the failure a library can catch.
  *
  * `unmetByStatement` is the other honest part: telling someone in words that
  * content is AI-generated does not embed a machine-readable mark, and Article
@@ -177,6 +209,8 @@ function requirementsOf(assessment: Assessment): readonly Requirement[] {
  */
 export function disclose(profile: SystemProfile, notice: Notice = {}): Disclosure {
   const assessment = assess(profile);
+  if (assessment.needsReview.length > 0) throw new UnresolvedQuestions(assessment.needsReview);
+
   const required = requirementsOf(assessment);
   const elements = [...new Set(required.flatMap((r) => r.elements.map((e) => e.id)))];
 

@@ -143,6 +143,23 @@ test("an exported record checks out against a plain sha256, without this library
   }
 });
 
+test("the wording that was shown is kept with the decision", () => {
+  const profile: SystemProfile = { role: "deployer", deepfake: true };
+  const log = new EvidenceLog({ now: fixedClock() });
+  const entry = recordDecision(
+    log,
+    profile,
+    disclose(profile, {
+      text: { "artificial-content": "This face is AI-generated." },
+      locale: "en-GB",
+    }),
+  );
+
+  assert.equal(entry.detail.statement, "This face is AI-generated.");
+  assert.equal(entry.detail.locale, "en-GB");
+  assert.deepEqual(entry.detail.elements, ["artificial-content"]);
+});
+
 test("the record keeps the inputs as stated, questions nobody answered included", () => {
   const profile: SystemProfile = {
     role: "deployer",
@@ -151,11 +168,9 @@ test("the record keeps the inputs as stated, questions nobody answered included"
     artisticOrSatirical: "unknown",
   };
   const log = new EvidenceLog({ now: fixedClock() });
-  const entry = recordDecision(
-    log,
-    profile,
-    disclose(profile, { text: { "artificial-content": "This face is AI-generated." } }),
-  );
+  // There is no notice to record here — disclose() refuses one while a question
+  // is open — and the open question is exactly what the file has to carry.
+  const entry = recordDecision(log, profile);
 
   const inputs = entry.detail.inputs as Record<string, unknown>;
   assert.equal(inputs.deepfake, true);
@@ -172,7 +187,7 @@ test("the record keeps the inputs as stated, questions nobody answered included"
     (entry.detail.needsReview as { question: string }[])[0].question,
     /manner of disclosure but not the duty/,
   );
-  assert.equal(entry.detail.statement, "This face is AI-generated.");
+  assert.equal(entry.detail.statement, undefined);
 });
 
 test("an exemption is kept with the reason that was claimed for it", () => {

@@ -6,6 +6,7 @@ import {
   requirements,
   DISCLOSURE_HEADER,
   IncompleteDisclosure,
+  UnresolvedQuestions,
 } from "../src/disclosure.ts";
 import { UnmarkedContent } from "../src/marker.ts";
 import type { SystemProfile } from "../src/policy.ts";
@@ -38,6 +39,44 @@ test("a notice missing a required element is refused, and names what is missing"
 
 test("blank wording is missing wording", () => {
   assert.throws(() => disclose(chatbot, { text: { "ai-system": "   " } }), IncompleteDisclosure);
+});
+
+// A profile nobody finished answering used to be served silently, with no
+// header at all — indistinguishable from a system that owes nothing.
+test("an unanswered question is refused, and the error carries the question", () => {
+  assert.throws(
+    () => disclose({ role: "provider", interactsWithPeople: "unknown" }, { text: words }),
+    (error: unknown) => {
+      assert.ok(error instanceof UnresolvedQuestions);
+      assert.deepEqual(
+        error.questions.map((review) => review.obligation.id),
+        ["art50-1"],
+      );
+      assert.match(error.message, /interacts directly with natural persons/);
+      return true;
+    },
+  );
+});
+
+// Until the question is answered nobody knows which elements the notice owes,
+// so the open question is reported before the blank wording.
+test("an open question is reported ahead of wording that is also missing", () => {
+  assert.throws(
+    () =>
+      disclose(
+        { role: "both", interactsWithPeople: true, deepfake: true, artisticOrSatirical: "unknown" },
+        { text: {} },
+      ),
+    UnresolvedQuestions,
+  );
+});
+
+test("an answered no leaves nothing open", () => {
+  const disclosure = disclose(
+    { role: "provider", interactsWithPeople: true, obviousFromContext: false },
+    { text: words },
+  );
+  assert.deepEqual(disclosure.obligations, ["art50-1"]);
 });
 
 test("exposure to emotion recognition takes two elements, not one", () => {

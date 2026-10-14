@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { IncompleteDisclosure } from "../src/disclosure.ts";
+import { IncompleteDisclosure, UnresolvedQuestions } from "../src/disclosure.ts";
 import { EvidenceLog } from "../src/log.ts";
 import { DISCLOSURE_HEADER, withDisclosure } from "../src/middleware.ts";
 import type { SystemProfile } from "../src/policy.ts";
@@ -25,6 +25,34 @@ test("the header rides on every response", async () => {
 // user halfway through a request.
 test("a handler cannot be wrapped without the wording its profile requires", () => {
   assert.throws(() => withDisclosure(jsonHandler, chatbot), IncompleteDisclosure);
+});
+
+// Same reasoning, one step earlier: an "unknown" would otherwise be served with
+// no header at all, which reads like a system that owes nothing.
+test("an unanswered question stops the wrapper before the first request", () => {
+  assert.throws(
+    () =>
+      withDisclosure(jsonHandler, { role: "provider", interactsWithPeople: "unknown" }, notice),
+    (error: unknown) => {
+      assert.ok(error instanceof UnresolvedQuestions);
+      assert.deepEqual(
+        error.questions.map((review) => review.obligation.id),
+        ["art50-1"],
+      );
+      assert.match(error.message, /interacts directly with natural persons/);
+      return true;
+    },
+  );
+});
+
+test("an answer of no is an answer, and the handler is wrapped", async () => {
+  const handler = withDisclosure(
+    jsonHandler,
+    { role: "provider", interactsWithPeople: true, obviousFromContext: false },
+    notice,
+  );
+  const response = await handler(new Request("https://example.com/chat"));
+  assert.equal(response.headers.get(DISCLOSURE_HEADER), "art50-1");
 });
 
 // A response body belongs to the service. Reshaping it without being asked is

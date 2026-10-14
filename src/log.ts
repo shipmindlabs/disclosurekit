@@ -170,6 +170,10 @@ export class EvidenceLog {
  * Record one disclosure decision: the inputs exactly as they were stated, what
  * the rules made of them, and the words that were shown.
  *
+ * The disclosure is optional because a profile with open questions has none —
+ * `disclose()` refuses to build one — and that is precisely the case worth
+ * writing down: the assessment, the inputs, and the questions still owed.
+ *
  * The record is written to be legible on its own. It repeats the article and
  * the summary of each obligation rather than only its id, keeps the reason for
  * every exemption and the text of every unanswered question, and names the
@@ -179,7 +183,7 @@ export class EvidenceLog {
 export function recordDecision(
   log: EvidenceLog,
   profile: SystemProfile,
-  disclosure: Disclosure,
+  disclosure?: Disclosure,
 ): Entry {
   const assessment = assess(profile);
   return log.append("assessment", {
@@ -201,9 +205,9 @@ export function recordDecision(
       article: obligation.article,
       question,
     })),
-    unmetByStatement: disclosure.unmetByStatement,
-    elements: disclosure.elements,
-    statement: disclosure.statement,
-    locale: disclosure.locale,
+    unmetByStatement: disclosure?.unmetByStatement,
+    elements: disclosure?.elements,
+    statement: disclosure?.statement,
+    locale: disclosure?.locale,
   });
 }

@@ -35,9 +35,12 @@ on each:
   be this package's most damaging possible mistake. It comes back as an applied
   duty with a note about the manner.
 - **A question nobody answered is not a no.** An input given as `"unknown"`
-  sends the obligation to `needsReview`, where nothing is safe to ship; an input
-  left out entirely decides the same way a `false` does but is written into the
-  record as `"not stated"`, because the two are not the same claim.
+  sends the obligation to `needsReview`, and nothing there is safe to ship:
+  `disclose()` refuses to build a notice while a question is open, so a wrapped
+  handler fails where the service starts rather than serving requests with no
+  header at all. An input left out entirely decides the same way a `false` does
+  but is written into the record as `"not stated"`, because the two are not the
+  same claim.
 
 The article has applied since **2 August 2026**. This package does not reason
 about dates: it reads the system as you describe it today and assumes the
@@ -148,10 +151,21 @@ disclose({ role: "provider", interactsWithPeople: true }, { text: {} });
 // ai-system — that the person is dealing with an AI system and not with a human
 ```
 
+An unanswered question is refused one step earlier, before the wording is even
+looked at, because until it is answered nobody knows what the notice owes:
+
+```ts
+disclose({ role: "provider", interactsWithPeople: "unknown" }, { text: {} });
+// UnresolvedQuestions: the assessment leaves a question unanswered, and nothing
+// here is safe to ship: Article 50(1): whether the system interacts directly
+// with natural persons
+```
+
 What cannot be checked here is whether your sentence says what it must, in the
 language you wrote it in. The check is that nothing was left blank; a person
 still has to read the words. Wrapping a handler builds the notice once, so a
-missing element fails where the service starts rather than in front of a user.
+missing element or an open question fails where the service starts rather than
+in front of a user.
 
 ## What it will not do
 
@@ -200,7 +214,9 @@ A question nobody answered is written down as `"not stated"`, not as a no. It
 decides the assessment the same way a `false` does, but it is not the same
 claim, and the record should not make one on your behalf. Exemptions keep the
 reason, adapted duties keep their note, and unanswered questions keep their
-wording, so the file argues its own case without this code.
+wording, so the file argues its own case without this code. A profile with open
+questions has no notice to record — `recordDecision(log, profile)` writes the
+assessment and the questions on their own.
 
 Entries are chained by hash, so a removed or edited entry is detectable and the
 check names which one:
