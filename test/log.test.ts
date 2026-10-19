@@ -9,6 +9,7 @@ import {
   EVIDENCE_FORMAT,
   GENESIS,
   HASH_ALGORITHM,
+  UnrecordableDetail,
   type Entry,
 } from "../src/log.ts";
 import { RULES_VERSION, type SystemProfile } from "../src/policy.ts";
@@ -107,6 +108,61 @@ test("a log survives export to JSONL and back", () => {
   assert.deepEqual(restored.entries, log.entries);
 });
 
+// A Date used to be hashed as {} and written to the file as a string, so the
+// record was never the bytes a reader would check.
+test("a Date in detail is recorded as the string JSON writes, and still verifies", () => {
+  const log = new EvidenceLog({ now: fixedClock() });
+  const entry = log.append("disclosure-shown", {
+    path: "/chat",
+    shownAt: new Date(Date.UTC(2026, 7, 2, 9, 30, 0)),
+    shown: [{ at: new Date(Date.UTC(2026, 7, 2, 9, 31, 0)) }],
+  });
+
+  assert.equal(entry.detail.shownAt, "2026-08-02T09:30:00.000Z");
+  assert.deepEqual(entry.detail.shown, [{ at: "2026-08-02T09:31:00.000Z" }]);
+
+  const line = log.toJSONL().split("\n")[0];
+  const { hash, ...body } = JSON.parse(line) as Entry;
+  assert.equal(hash, entry.hash);
+  assert.equal((body.detail as Record<string, unknown>).shownAt, "2026-08-02T09:30:00.000Z");
+  assert.equal(EvidenceLog.fromJSONL(log.toJSONL()).verify().ok, true);
+  assert.equal(EvidenceLog.fromJSON(JSON.parse(JSON.stringify(log))).verify().ok, true);
+});
+
+// Dropping or rewriting a value quietly would make the hash a promise about
+// something nobody can read back, so the call fails instead.
+test("a value JSON cannot carry is refused rather than hashed as something else", () => {
+  const log = new EvidenceLog({ now: fixedClock() });
+
+  assert.throws(() => log.append("assessment", { seen: new Map([["a", 1]]) }), UnrecordableDetail);
+  assert.throws(() => log.append("assessment", { count: Number.NaN }), UnrecordableDetail);
+  assert.throws(() => log.append("assessment", { size: 10n }), UnrecordableDetail);
+  assert.throws(
+    () => log.append("assessment", { applies: [{ note: () => "later" }] }),
+    (error: unknown) => {
+      assert.ok(error instanceof UnrecordableDetail);
+      assert.equal(error.path, "detail.applies[0].note");
+      return true;
+    },
+  );
+
+  // A refused detail leaves no entry behind, so the chain is untouched.
+  assert.deepEqual(log.entries, []);
+  assert.equal(log.verify().ok, true);
+});
+
+test("a key with no value is dropped, exactly as JSON drops it", () => {
+  const a = new EvidenceLog({ now: fixedClock() }).append("assessment", {
+    statement: "This face is AI-generated.",
+    locale: undefined,
+  });
+  const b = new EvidenceLog({ now: fixedClock() }).append("assessment", {
+    statement: "This face is AI-generated.",
+  });
+  assert.equal(a.hash, b.hash);
+  assert.ok(!("locale" in a.detail));
+});
+
 // The point of the whole file: months from now the reader has the lines and a
 // SHA-256 and nothing else. This test is that reader — it re-implements the
 // documented recipe instead of calling verify().
@@ -132,7 +188,7 @@ test("an exported record checks out against a plain sha256, without this library
       locale: "fr",
     }),
   );
-  log.append("disclosure-shown", { path: "/chat" });
+  log.append("disclosure-shown", { path: "/chat", shownAt: new Date(Date.UTC(2026, 7, 2, 9, 30)) });
 
   let previousHash = GENESIS;
   for (const line of log.toJSONL().split("\n").filter((l) => l !== "")) {

@@ -14,6 +14,11 @@
  * field, serialise what is left as JSON with object keys sorted and no
  * whitespace, SHA-256 it, compare. `previousHash` is the hash of the record
  * before it; the first one is GENESIS.
+ *
+ * For that recipe to hold, what is hashed has to be what a JSON reader will
+ * get: a detail is reduced to plain JSON on the way in, and a value JSON
+ * cannot carry is refused rather than hashed as something nobody will read
+ * back.
  */
 
 import { createHash } from "node:crypto";
@@ -49,6 +54,85 @@ export type Entry = {
 
 /** The chain's anchor: there is no entry before the first one. */
 export const GENESIS = "0".repeat(64);
+
+/**
+ * Raised instead of recording a detail that JSON cannot carry.
+ *
+ * A `Map`, a `BigInt`, a `NaN`, a cycle: each one would be dropped or rewritten
+ * on its way through JSON, so the record would no longer be the bytes a reader
+ * gets, and the hash would be a promise about something nobody can see. Better
+ * a loud failure at the call site than a line that does not verify.
+ */
+export class UnrecordableDetail extends Error {
+  /** Where in the detail the offending value sat, e.g. `detail.shown[0].at`. */
+  readonly path: string;
+
+  constructor(path: string, what: string) {
+    super(
+      `the detail cannot be recorded: ${path} is ${what}, which JSON cannot carry, ` +
+        "and a record is hashed as the bytes a JSON reader will get",
+    );
+    this.name = "UnrecordableDetail";
+    this.path = path;
+  }
+}
+
+/**
+ * Reduce a value to what JSON can carry, or refuse it.
+ *
+ * `toJSON` is honoured exactly where `JSON.stringify` honours it, so a Date is
+ * recorded as the string it serialises to rather than as the empty object a
+ * naive walk would see. Keys whose value is `undefined` are dropped, as JSON
+ * drops them; everything else JSON would silently change is an error.
+ */
+function plainJSON(value: unknown, path: string, seen: Set<object>): unknown {
+  if (value !== null && typeof value === "object") {
+    const { toJSON } = value as { toJSON?: unknown };
+    if (typeof toJSON === "function") {
+      return plainJSON((toJSON as () => unknown).call(value), path, seen);
+    }
+  }
+
+  switch (typeof value) {
+    case "string":
+    case "boolean":
+      return value;
+    case "number":
+      if (!Number.isFinite(value)) throw new UnrecordableDetail(path, `the number ${value}`);
+      return value;
+    case "bigint":
+      throw new UnrecordableDetail(path, "a bigint");
+    case "function":
+      throw new UnrecordableDetail(path, "a function");
+    case "symbol":
+      throw new UnrecordableDetail(path, "a symbol");
+    case "undefined":
+      throw new UnrecordableDetail(path, "undefined");
+  }
+
+  if (value === null) return null;
+
+  const object = value as object;
+  if (seen.has(object)) throw new UnrecordableDetail(path, "a circular reference");
+  seen.add(object);
+  try {
+    if (Array.isArray(object)) {
+      return object.map((item, index) => plainJSON(item, `${path}[${index}]`, seen));
+    }
+    const prototype = Object.getPrototypeOf(object) as unknown;
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new UnrecordableDetail(path, `a ${object.constructor?.name ?? "non-plain"} object`);
+    }
+    const plain: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(object)) {
+      if (item === undefined) continue;
+      plain[key] = plainJSON(item, path === "" ? `detail.${key}` : `${path}.${key}`, seen);
+    }
+    return plain;
+  } finally {
+    seen.delete(object);
+  }
+}
 
 /** Stable stringify, so an unchanged entry always hashes the same. */
 function canonical(value: unknown): string {
@@ -89,6 +173,7 @@ export class EvidenceLog {
   }
 
   append(kind: EventKind, detail: Record<string, unknown> = {}): Entry {
+    const recorded = plainJSON(detail, "", new Set<object>()) as Record<string, unknown>;
     const previous = this.#entries.at(-1);
     const withoutHash = {
       format: EVIDENCE_FORMAT,
@@ -97,7 +182,7 @@ export class EvidenceLog {
       at: this.#now().toISOString(),
       kind,
       rules: this.#rules,
-      detail,
+      detail: recorded,
       previousHash: previous?.hash ?? GENESIS,
     };
     const entry: Entry = { ...withoutHash, hash: digest(withoutHash) };

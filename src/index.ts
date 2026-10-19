@@ -53,6 +53,7 @@ export {
   EVIDENCE_FORMAT,
   GENESIS,
   HASH_ALGORITHM,
+  UnrecordableDetail,
   type Entry,
   type EventKind,
   type VerifyResult,
