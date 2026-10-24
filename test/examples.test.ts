@@ -1,9 +1,10 @@
 /**
- * Three systems carried end to end: a support chatbot, a synthetic image
- * pipeline and an emotion-recognition kiosk. Each one goes from a profile to a
- * served response and the line of evidence it leaves behind. The other test
- * files check the pieces; this one checks that the pieces still add up to what
- * a deployment actually needs.
+ * Four systems carried end to end: a support chatbot, a synthetic image
+ * pipeline, an emotion-recognition kiosk and an AI interviewer. Each one goes
+ * from a profile to a served response and the line of evidence it leaves
+ * behind. The other test files check the pieces; this one checks that the
+ * pieces still add up to what a deployment actually needs, and that the
+ * scenarios in the README say what the code does.
  */
 
 import { describe, test } from "node:test";
@@ -19,6 +20,7 @@ import {
   IncompleteDisclosure,
   RULES_VERSION,
   UnmarkedContent,
+  UnresolvedQuestions,
   type Entry,
   type SystemProfile,
 } from "../src/index.ts";
@@ -234,5 +236,88 @@ describe("an emotion-recognition kiosk", () => {
     assert.match(excluded[0].because, /criminal offences/);
     assert.equal(inputs(log.entries[0]).lawEnforcementAuthorised, true);
     assert.equal(log.verify().ok, true);
+  });
+});
+
+describe("an AI interviewer talking to job candidates", () => {
+  const vendor: SystemProfile = { role: "provider", interactsWithPeople: true };
+  const sentence = "You are being interviewed by an AI system, not by a person.";
+  const notice = { locale: "en-GB", text: { "ai-system": sentence } };
+
+  const handler = () =>
+    new Response(JSON.stringify({ question: "Tell me about your last project." }), {
+      headers: { "content-type": "application/json" },
+    });
+
+  test("the vendor owes one element, due before the candidate says anything", () => {
+    const assessment = assess(vendor);
+    assert.deepEqual(
+      assessment.applies.map((a) => a.obligation.id),
+      ["art50-1"],
+    );
+    assert.deepEqual(assessment.excluded, []);
+    assert.deepEqual(assessment.needsReview, []);
+
+    const [requirement] = requirements(vendor);
+    assert.equal(requirement.measure, "inform-before-interaction");
+    assert.deepEqual(
+      requirement.elements.map((element) => element.id),
+      ["ai-system"],
+    );
+    assert.match(requirement.placement.when, /first interaction/);
+    assert.match(requirement.placement.where, /before they say anything/);
+  });
+
+  test("the interview endpoint answers disclosed, and the file shows it", async () => {
+    const log = new EvidenceLog({ now: clock() });
+    const wrapped = withDisclosure(handler, vendor, { ...notice, log });
+
+    const response = await wrapped(new Request("https://example.com/interview"));
+    assert.equal(response.headers.get(DISCLOSURE_HEADER), "art50-1");
+
+    assert.deepEqual(log.entries.map((entry) => entry.kind), ["assessment", "disclosure-shown"]);
+    const [, shown] = log.entries;
+    assert.equal(shown.detail.path, "/interview");
+    assert.equal(shown.detail.statement, sentence);
+    assert.equal(shown.detail.locale, "en-GB");
+    assert.equal(log.verify().ok, true);
+  });
+
+  // The employer asks the vendor for the notice; it cannot file the duty as
+  // handled, and cannot claim an exemption from it either.
+  test("an employer running a vendor's interviewer holds 50(1) in neither list", () => {
+    const employer = assess({ role: "deployer", interactsWithPeople: true });
+    assert.deepEqual(employer.applies.map((a) => a.obligation.id), []);
+    assert.deepEqual(employer.excluded.map((e) => e.obligation.id), []);
+    assert.deepEqual(employer.needsReview, []);
+  });
+
+  test("an avatar nobody has judged against the context test cannot be wrapped", () => {
+    assert.throws(
+      () => withDisclosure(handler, { ...vendor, obviousFromContext: "unknown" }, notice),
+      (error: unknown) => {
+        assert.ok(error instanceof UnresolvedQuestions);
+        assert.deepEqual(
+          error.questions.map((review) => review.obligation.id),
+          ["art50-1"],
+        );
+        assert.match(error.message, /reasonably well-informed/);
+        return true;
+      },
+    );
+  });
+
+  // Article 50(3) says how to disclose emotion inference. Whether inferring a
+  // candidate's emotions is permitted at all is Article 5(1)(f), and no row of
+  // this table speaks to it.
+  test("inferring candidates' emotions adds a notice requirement, nothing more", () => {
+    const [requirement] = requirements({ role: "deployer", emotionRecognition: true });
+    assert.equal(requirement.measure, "inform-exposed-persons");
+    assert.deepEqual(requirement.obligations, ["art50-3"]);
+    assert.deepEqual(
+      requirement.elements.map((element) => element.id),
+      ["ai-system", "biometric-operation"],
+    );
+    assert.match(requirement.placement.when, /first exposure/);
   });
 });

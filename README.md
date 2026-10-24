@@ -125,6 +125,114 @@ assess(profile).applies[0].note;
 //  does not hamper the display or enjoyment of the work"
 ```
 
+## An AI interviewer talking to job candidates
+
+A vendor sells an interviewer that speaks to job candidates and writes the
+conversation up for the employer. Article 50(1) is the whole of what this
+package finds in that system, and it is addressed to the vendor rather than to
+the company doing the hiring.
+
+```ts
+import { requirements } from "disclosurekit";
+
+requirements({ role: "provider", interactsWithPeople: true });
+// [{ measure: "inform-before-interaction",
+//    obligations: ["art50-1"],
+//    elements: [{ id: "ai-system",
+//                 must: "that the person is dealing with an AI system and not
+//                        with a human" }],
+//    placement: { when: "at the latest at the time of the first interaction",
+//                 where: "in the interface the person is already using, before
+//                         they say anything to it", … },
+//    satisfiedByText: true }]
+```
+
+One element, one deadline. The candidate has to know before they answer the
+first question — not in the write-up afterwards, and not on a policy page
+linked from the invitation.
+
+```ts
+import { withDisclosure, EvidenceLog } from "disclosurekit";
+
+const log = new EvidenceLog();
+
+export default withDisclosure(
+  interviewHandler,
+  { role: "provider", interactsWithPeople: true },
+  {
+    locale: "en-GB",
+    text: { "ai-system": "You are being interviewed by an AI system, not by a person." },
+    log,
+  },
+);
+```
+
+Every response from `/interview` carries `AI-Disclosure: art50-1`, and the log
+holds two records: the `assessment`, written once when the handler was wrapped,
+and a `disclosure-shown` for the interview that was served, with the path and
+the wording that went out.
+
+The employer running that interviewer is on the other side of the article:
+
+```ts
+const employer = assess({ role: "deployer", interactsWithPeople: true });
+employer.applies;  // []
+employer.excluded; // []
+```
+
+50(1) is in neither list. It is not the employer's duty and not the employer's
+exemption; an employer who wants it met asks the vendor for the notice rather
+than filing the obligation as handled.
+
+An interviewer that appears as a human-looking avatar raises the one question
+the package will not answer for you — whether the AI is obvious to a reasonably
+well-informed, observant person. Until somebody judges it, the handler cannot
+be wrapped:
+
+```ts
+withDisclosure(
+  interviewHandler,
+  { role: "provider", interactsWithPeople: true, obviousFromContext: "unknown" },
+  notice,
+);
+// UnresolvedQuestions: the assessment leaves a question unanswered, and nothing
+// here is safe to ship: Article 50(1): whether the use of an AI system is
+// obvious to a reasonably well-informed, observant person
+```
+
+That is a start-up failure rather than a run of interviews conducted with no
+header at all, which would look exactly like a system that owes nothing.
+
+### What Article 50 does not settle for this system
+
+**Transparency is the smaller half.** Recruitment and the evaluation of
+candidates are high-risk use under Annex III point 4(a) of Regulation (EU)
+2024/1689. The duties that follow — risk management, data governance, logging,
+human oversight, conformity assessment, registration — sit in Chapter III, and
+none of them is in this table. An `assess()` with nothing left open means the
+transparency article is accounted for, and says nothing about the rest.
+
+**A notice is not a permission.** If the interviewer infers candidates'
+emotions, the deployer gets a notice requirement out of this package:
+
+```ts
+requirements({ role: "deployer", emotionRecognition: true });
+// [{ measure: "inform-exposed-persons",
+//    obligations: ["art50-3"],
+//    elements: [{ id: "ai-system", … }, { id: "biometric-operation", … }],
+//    placement: { when: "at the latest at the time of the first exposure", … },
+//    satisfiedByText: true }]
+```
+
+That requirement answers how to disclose, not whether the practice is allowed.
+Article 5(1)(f) prohibits AI systems that infer emotions of a natural person in
+the areas of workplace and education institutions, outside medical and safety
+reasons, and a notice does not make a prohibited practice lawful. Whether
+"workplace" reaches a candidate who is not yet an employee is a reading of that
+prohibition, and this section cites Article 5(1)(f) alone for it: the
+Commission's guidelines on prohibited AI practices are where such a reading
+would come from, and a paragraph nobody has checked is worse than no citation.
+
 ## The words are yours
 
 The package knows which elements a notice has to get across, and when and where
