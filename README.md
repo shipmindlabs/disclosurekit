@@ -296,6 +296,26 @@ sign is the most dangerous thing this package could ship. There is a `Marker`
 interface to plug one in, and the default one reports plainly that nothing was
 marked.
 
+What it does do is keep the record of whichever marker you wired up.
+`markContent(marker, target, log)` runs it and writes `content-marked` with the
+marker, the method and a digest of the content that went out, or
+`content-unmarked` with the reason nothing was marked:
+
+```ts
+import { markContent, UnmarkedContent, EvidenceLog } from "disclosurekit";
+
+const log = new EvidenceLog();
+await markContent(new UnmarkedContent(), { content: pixels, mediaType: "image/png" }, log);
+log.entries.at(-1)?.detail.reason;
+// "no marker configured: machine-readable marking under Article 50(2) is not met
+//  by this deployment"
+```
+
+A marker that reports success while returning the content byte for byte is
+recorded as unmarked, with the contradiction as the reason, and the result
+handed back says so too. No byte changed, so there is no mark to log, whatever
+the marker claims.
+
 **It does not tell you an obligation is someone else's problem in a way you can
 lean on.** Article 50 splits duties between provider and deployer; obligations
 addressed to a role you did not claim appear in neither list, because they are
@@ -387,7 +407,7 @@ are honest gaps rather than oversights.
 |---|---|
 | Covered | Article 50(1)–(5): interaction, synthetic content, emotion recognition and biometric categorisation, deep fakes, public-interest text |
 | Disclosure | required elements, placement rules, your wording, `AI-Disclosure` header, optional JSON key |
-| Evidence | hash-chained append-only log, inputs and rule version on every record, JSONL export verifiable with SHA-256 alone |
+| Evidence | hash-chained append-only log, inputs and rule version on every record, marker outcomes with the digest of what went out, JSONL export verifiable with SHA-256 alone |
 | Not yet | ready-made UI components, marker adapters for C2PA, transform-survival checks, other articles of the Act |
 
 The `AI-Disclosure` header is this package's own convention. No standard header

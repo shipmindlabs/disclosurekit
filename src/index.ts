@@ -41,6 +41,7 @@ export {
 } from "./disclosure.ts";
 
 export {
+  markContent,
   UnmarkedContent,
   type Marker,
   type MarkResult,
